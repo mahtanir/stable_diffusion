@@ -1,0 +1,40 @@
+- Residual blocks typically have the following pattern 
+    Residual = x 
+    Initial normalisation
+    Activation layer
+    Conv (in_channles, out_channels)
+    Normalise
+    Activation 
+    (Dropout)
+    Conv2 (out_channels, out_channels)
+    Add residual to output (nn.Identify() if in == out else nn.Conv2d(in, out, kernel=1, padding=0)) or kernel_size=3, padding=1
+Height and Width remain the same typically but channels may change. 
+
+- Attention 
+    d_heads can complicate things. Make sure to transpose when adjusting for d_embed -> n_head, d_head = (d_embed // n_head)
+    torch.chunk(x, 3, -1) fast way of getting Q,K,V fron nn.Linear(d_embed, d_embed*3) vs 3 separate linear 
+    Linear acts on last layer dims only. All else same. 
+    Output preceded by a linear layer. 
+
+*args can be used for varying inputs into function.
+
+SPECIFIC
+
+    Attention w/ Images
+        SELF ATTENTION
+            If we have N, C, H, W -> N, C, H*W -> N, H*W, C
+                Essentially seq_len = pixels here and channels = embedding or features. 
+                Attention of how much each pixel relates to each other. 
+
+    UNETResidualBlock
+        We add noise within this step within / in between conv blocks. 
+    
+    UNET
+        Typically this is 
+            Encoder 
+                CONV2d (reduce the h,w in encoder)
+                (UNETResidualBlock, UNETAttentionBlock) * 2 
+            // Aside from first and last of 4 chunks of the above, first UNETResidualBlock increases channels * 2 
+            // Only three convs actually downsample or reduce height and width by scale factor 2, not the initial one. 
+            Decoder
+                Upsammple (increase h,w using nn.Upsample following by simple conv i.e kernel = 1, padding = 0, inchannel=outchannels)
