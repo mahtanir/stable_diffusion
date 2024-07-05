@@ -32,7 +32,7 @@ class SelfAttention(nn.Module):
 
         attention_weights = torch.matmul(Q, K.transpose(-1,-2)) #remember in matmul we consider n_seq, dim for the matrix as transpose. Batch and head count is same. 
         if (casual_mask):
-            #mask is siagonal bottom right to top left. All above  are 1, else 0. This is what we mask, so n1 top is completely masked but for itself, n2 has n1,n2 only, etc... 
+            #mask is diagonal bottom right to top left. All above  are 1, else 0. This is what we mask, so n1 top is completely masked but for itself, n2 has n1,n2 only, etc... 
             mask = torch.ones([seq_len, seq_len], dtype=torch.bool).triu(1)
             attention_weights.masked_fill_(mask, -torch.inf) #replaces w/ value where mask is true
 
@@ -50,6 +50,50 @@ class SelfAttention(nn.Module):
         #W0 matrix 
         output = self.out_proj(output)
         return output 
+    
+class CrossAttention(nn.Module):
+    def __init__(self, n_head, d_embed, d_cross, in_proj_bias = True, out_proj_bias = False) -> None:
+        super().__init__()
+        #do projections and then split up 
+        self.proj_Q = nn.Linear(d_embed, d_embed)
+        self.proj_k = nn.Linear(d_cross, d_embed)
+        self.proj_v = nn.Linear(d_cross, d_embed)
+        self.n_head = n_head
+        self.d_head = d_embed // n_head #how much info each head will see 
+        self.out_proj = nn.Linear(d_embed, d_embed)
+    
+    def forward(self, latent, context):
+        #latent dims are batch_size, seq_len_q (pixels), d_embed
+        #context dims are batch size, seq_len_kv (token len), d_cross = batch size, 77, 768)
+        input_shape_latent = latent.shape
+        batch_size, _, d_embed = input_shape_latent 
+        new_shape = (batch_size, -1, self.n_head, self.d_head)
+        Q = self.proj_Q(latent)
+        K, V = self.proj_k(context), self.proj_v(context)
+
+        # Batch_size,seq_q, d_embed-> Batch_size,n_head, seq_q, d_h
+        Q = Q.view(new_shape).transpose(1,2) 
+        # Batch_size,seq_kv, d_cross-> Batch_size,n_head, seq_kv, d_h
+        K = Q.view(new_shape).transpose(1,2)
+        V = Q.view(new_shape).transpose(1,2)
+
+        attention_matrix = torch.matmul(Q, K.transpose(-1,-2)) #Batch_size, n_head, seq_q, seq_kv -> so the attention of pixels to each token and vise versa (each token pays attention to each pixel and vise versa)
+        attention_matrix = attention_matrix / math.sqrt(self.d_head)
+        
+        weights = F.softmax(cross_attention, dim=-1) #how much attention each pixel relative to the token 
+        #-> Batch_size,n_head, seq_q, d_h
+        cross_attention = attention_matrix @ V
+        output = cross_attention.transpose(1,2).contiguous()
+        #-> batch_size, seq_len_q (pixels), d_embed
+        output = output.view(input_shape_latent)
+
+        return self.out_proj(output)
+
+
+
+
+
+
 
 
 

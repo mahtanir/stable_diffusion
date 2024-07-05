@@ -79,7 +79,7 @@ class UNET_ResidualBlock(nn.Module):
         x = self.conv_merged(x)
         x = x + self.residual_layer(residual)
 
-class UNETAttentionBlock(nn.Module):
+class UNET_AttentionBlock(nn.Module):
     def __init__(self, n_head, n_embed, d_context = 768) -> None:
         super().__init__()
         channels = n_head * n_embed #number of channels outputted by UNETResidualBlock 
@@ -101,18 +101,35 @@ class UNETAttentionBlock(nn.Module):
         residual_long = x 
         x = self.groupnorm(x)
         x = self.conv_input(x)  #no dimension changes at all 
-        #(Batch size, channels, height, width) -> (Batch size, height *width, channels)
+        n, c, h, w = x.shape
+        #(Batch size, channels, height, width) -> (Batch size, height *width, channels) so attention across for each pixel
         x = x.view(x.shape[0], x.shape[1], x.shape[2]*x.shape[3]).transpose(-1,-2)
         residual_short = x 
-        x = self.layernorm_1(x)
+        x = self.layernorm_1(x) #i.e norm each pixel?
         x = self.attention_1(x)  #maintains same dimensions as the input by construction as long as passed n_embed = channels
         x = x + residual_short
 
         residual_short = x
+        #(Batch size, height *width, channels)
+        #Normalisation + Cross Attention With Skip Connection --. need to convert back to image from attention, HOW?
+        x = self.layernorm_2(x)
+        x = self.attention_2(x,context)
+        x+= residual_short
+        xresidual_short=x 
 
-        #Normalisation + Cross Attention With Skip Connection 
 
-        return x 
+        x = self.layernorm_3(x)
+        x, gate = self.linear_geglu_1(x).chunk(2, dim=-1) #4*channels*2 /2 now so 4*channels to channels
+        x = x * F.gelu(gate) 
+
+        x=self.linear_geglu_2(x)
+        x += residual_short
+
+
+        x = x.transpose(-1,-2)
+        x = x.view((n,c,h,w))
+
+        return self.conv_output(x) + residual_long
 
 class UNET(nn.Module):
     def __init__(self) -> None:
@@ -183,7 +200,7 @@ class UNET_OutputLayer(nn.Module):
 class Diffusion(nn.Module):
     def __init__(self) -> None:
         super().__init__()
-        self.time_embedding = TimeEmbedding(320) #320 = size of time embedding -> needs to know current timestemp 
+        self.time_embedding = TimeEmbedding(320) #320 = size of time embedding -> needs to know current timestemp - I guess embedding from srach 
         self.unet = UNET()
         self.final = UNET_OutputLayer(320, 4)
     

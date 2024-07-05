@@ -7,7 +7,7 @@
     Activation 
     (Dropout)
     Conv2 (out_channels, out_channels)
-    Add residual to output (nn.Identify() if in == out else nn.Conv2d(in, out, kernel=1, padding=0)) or kernel_size=3, padding=1
+    Add residual to output (nn.Identiyy() if in == out else nn.Conv2d(in, out, kernel=1, padding=0)) or kernel_size=3, padding=1
 Height and Width remain the same typically but channels may change. 
 
 - Attention 
@@ -34,7 +34,26 @@ SPECIFIC
             Encoder 
                 CONV2d (reduce the h,w in encoder)
                 (UNETResidualBlock, UNETAttentionBlock) * 2 
+                //At every point almost as if we're adding the attention infused output of the residualblocks. i.e see VAE_Attention for how (Jul 2, 2024 version)
             // Aside from first and last of 4 chunks of the above, first UNETResidualBlock increases channels * 2 
             // Only three convs actually downsample or reduce height and width by scale factor 2, not the initial one. 
+            // note that in residualblocks we are also adding the time 
             Decoder
                 Upsammple (increase h,w using nn.Upsample following by simple conv i.e kernel = 1, padding = 0, inchannel=outchannels)
+    
+    VAE:
+        We use the latent from the VAE in UNET 
+        ENCODER: The latent vector is approximated by a normal dist due to the minimisation of the prior and the encoder prob distribution in KL divergence 
+            from the ELBO loss minimisation object. 
+            The sampling of the latent is z = mu + sigma*noise, ideally noise small so we choose the most probable at the mean. 
+        
+        DECODER: We decode it using similat VAE_Residual blocks i.e groupnorm, silu, conv, repeat add residual at end. 
+        At the end we have 3 channeled image. 
+
+    Other:
+        Embeddings are used in clip to convert from vocab to embeddings and then we add position which is also a linear layer, HOWEVER,
+        seems like a variant of that is in the time_embedding we pass to the unet, seems like we create an embedding via linear layers consecutive. 
+
+    
+
+    

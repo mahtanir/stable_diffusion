@@ -9,7 +9,7 @@ class CLIPEmbedding(nn.Module):
     def __init__(self, n_vocab, n_embed, n_tokens) -> None:
         super().__init__()
         self.token_embedding = nn.Embedding(n_vocab, n_embed)
-        self.positional_embedding = nn.Parameter(torch.zeros(n_tokens, n_embed)) #seq_len, embed. ie for each embedding feature, pos info. 
+        self.positional_embedding = nn.Parameter(torch.zeros(n_tokens, n_embed)) #seq_len, embed. ie for each embedding feature, pos info. IS N_TOKENS vocab? 
         #don't use sinuosidal like in normal transofrmer, use learnt params that tell model positional info. 
 
     def forward(self, tokens):
@@ -60,7 +60,7 @@ class CLIP(nn.Module):
 
         self.layernorm = nn.LayerNorm(768)
 
-    def forward(self, tokens: torch.LongTensor) -> torch.FloatTensor:
+    def forward(self, tokens: torch.LongTensor) -> torch.FloatTensor: 
         #long tensor because tokens are positions of token in the vocab 
         tokens = tokens.type(torch.long) #is this tokens one hot encoding or just a number? Seems to just be a number. A long tensor in PyTorch refers to a tensor with integer numbers as its data type. Specifically, in PyTorch, a long tensor is a tensor with a torch.int64 data type
         #Batch size, seq_len -> Batch_size, Seq_Len, Dim
