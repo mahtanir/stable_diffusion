@@ -54,6 +54,12 @@ SPECIFIC
         Embeddings are used in clip to convert from vocab to embeddings and then we add position which is also a linear layer, HOWEVER,
         seems like a variant of that is in the time_embedding we pass to the unet, seems like we create an embedding via linear layers consecutive. 
 
+    DDPM:
+        In UNET we incrementally add noise back to the output and then recursively run the algorithm again. The noise typically is gaussian and the DDPM is responsible for 
+        general the noise samples from a predefined gaussian process. Random number needed for randmoisation of noise. 
+
+        I think incremental noise added reduces in variance to ensure progress is being made, else we revert back to the normal noise image at t=0. 
+
     
 
     

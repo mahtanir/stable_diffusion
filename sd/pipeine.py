@@ -73,5 +73,13 @@ def generate(prompt: str, uncond_prompt: str, input_image=None, strength=0.8, do
         if input_image: #i.e image to image with some text prompt to modify it slightly after imposing noise 
             encoder = models['encoder']
             encoder.to(device)
+            input_image_tensor = input_image.resize((HEIGHT, WIDTH)) #check the filetype here TODO
+            input_image_tensor = np.array(input_image_tensor)
+            input_image_tensor = torch.tensor(input_image_tensor, dtype=torch.float32)
+            input_image_tensor = rescale(input_image_tensor, (0,255), (-1,1)) #unet wants it normalised like this 
+            #Height, Width, Channels -> Batch Size=1, Height, Width, Channels
+            input_image_tensor = input_image_tensor.unsqueeze(0)
+            #reshape for pytorch 
+            input_image_tensor = input_image_tensor.permute(0,3,1,2)
 
 
