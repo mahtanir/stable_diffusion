@@ -67,7 +67,6 @@ class UNET_ResidualBlock(nn.Module):
         residual = x 
         #feature or x: Batch size, in_channels, height, width
         #time (1,1280)
-        residual = x 
         x = self.groupnorm_feature(x)
         x = F.silu(x)
         x = self.conv_features(x)
@@ -115,7 +114,7 @@ class UNET_AttentionBlock(nn.Module):
         x = self.layernorm_2(x)
         x = self.attention_2(x,context)
         x+= residual_short
-        xresidual_short=x 
+        residual_short=x 
 
 
         x = self.layernorm_3(x)
@@ -140,15 +139,15 @@ class UNET(nn.Module):
             SwitchSequential(nn.Conv2d(4,320, kernel_size=3, padding=1)), #given a list of layers, will apply 1 by 1 but will know params?
             SwitchSequential(UNET_ResidualBlock(320, 320), UNET_AttentionBlock(8, 40)), #n_head * n_embed = 320
             SwitchSequential(UNET_ResidualBlock(320,320), UNET_AttentionBlock(8,40)),
-            #(Batch Size, 4, Height/8, Width/8) - > (Batch Size, 4, Height/16, Width/16 )
+            #(Batch Size, 320, Height/8, Width/8) - > (Batch Size, 640, Height/16, Width/16 )
             SwitchSequential(nn.Conv2d(320, 320, kernel_size=3, padding=1, stride=2)),
             SwitchSequential(UNET_ResidualBlock(320, 640), UNET_AttentionBlock(8, 80)),
             SwitchSequential(UNET_ResidualBlock(640,640), UNET_AttentionBlock(8,80)),
-             #(Batch Size, 4, Height/16, Width/16) - > (Batch Size, 4, Height/32, Width/32)
+             #(Batch Size, 640, Height/16, Width/16) - > (Batch Size, 1280, Height/32, Width/32)
             SwitchSequential(nn.Conv2d(640, 640, kernel_size=3, padding=1, stride=2)),
             SwitchSequential(UNET_ResidualBlock(640, 1280), UNET_AttentionBlock(8, 160)),
             SwitchSequential(UNET_ResidualBlock(1280,1280), UNET_AttentionBlock(8, 160)),
-             #(Batch Size, 4, Height/32, Width/32) - > (Batch Size, 4, Height/64, Width/64)
+             #(Batch Size, 1280, Height/32, Width/32) - > (Batch Size, 1280, Height/64, Width/64)
             SwitchSequential(nn.Conv2d(1280, 1280, kernel_size=3, padding=1, stride=2)),
             SwitchSequential(UNET_ResidualBlock(1280, 1280)),
             SwitchSequential(UNET_ResidualBlock(1280,1280))
@@ -180,6 +179,21 @@ class UNET(nn.Module):
             SwitchSequential(UNET_ResidualBlock(640, 320), UNET_AttentionBlock(8, 40))#n_head * n_embed = 320
         )
     def forward(self, x, context, time):
+        # x: (Batch_Size, 4, Height / 8, Width / 8)
+        # context: (Batch Size, Seq Len, dim)
+        #time: (1,1280)
+        skip_connections = [] 
+        for layer in self.encoders:
+            x = layer(x, context, time) #context always separately considered. 
+            skip_connections.append(x)
+        
+        x = self.bottleneck(x)
+        
+        #(Batch Size, 1280, h / 64, w / 64)
+        for layers in self.decoders:
+            x = torch.cat((x, skip_connections.pop()), dim=1) #i.e this is the skip connection from the corresponding encoder block. We concat to the channels. So it doubles hence the 2560 start 
+            x = layers(x, context, time)
+
         return x
             
            

@@ -56,7 +56,7 @@ class CrossAttention(nn.Module):
         super().__init__()
         #do projections and then split up 
         self.proj_Q = nn.Linear(d_embed, d_embed)
-        self.proj_k = nn.Linear(d_cross, d_embed)
+        self.proj_k = nn.Linear(d_cross, d_embed) #context
         self.proj_v = nn.Linear(d_cross, d_embed)
         self.n_head = n_head
         self.d_head = d_embed // n_head #how much info each head will see 
